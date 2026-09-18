@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>데일리 AI 뉴스레터 — 관심사별 큐레이션</title>
+<meta name="description" content="러닝 에이전트가 관심사 주제별 탭으로 큐레이션하는 개인화 AI 뉴스레터. 각 주제마다 하나의 핵심 하이라이트." />
+
+<!-- 시스템 다크/라이트를 페인트 전에 반영 (FOUC 방지) -->
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("nl-theme"); // "light" | "dark" | null(=시스템)
+      if (saved) document.documentElement.dataset.nlTheme = saved;
+    } catch (e) {}
+  })();
+</script>
+
+<style>
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
+/* ============================================================================
+   Folio Design System — 토큰 서브셋 (단일 HTML 인라인)
+   원본: claude.ai/design "노션 디자인 시스템" · Notion 컬러 팔레트
+   ============================================================================ */
+.folio, .folio * { box-sizing: border-box; }
+
+.folio {
+  --fl-font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  --fl-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--fl-font-sans);
+  font-feature-settings: "ss03", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* scales */
+  --fl-radius-sm: 4px; --fl-radius: 6px; --fl-radius-md: 8px; --fl-radius-lg: 12px;
+  --fl-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fl-dur-fast: 120ms; --fl-dur-normal: 180ms;
+
+  /* ---- LIGHT (기본) — Notion 컬러 ---- */
+  --fl-bg: #ffffff;
+  --fl-surface: #ffffff;
+  --fl-surface-2: #f7f6f3;
+  --fl-surface-3: #f1f0ec;
+  --fl-hover: rgba(55, 53, 47, 0.06);
+  --fl-active: rgba(55, 53, 47, 0.12);
+
+  --fl-text: #37352f;
+  --fl-text-secondary: #525049;
+  --fl-text-tertiary: #787774;
+  --fl-text-quaternary: #9b9a97;
+  --fl-text-link: #2d6fc5;
+
+  --fl-border-subtle: rgba(15, 14, 12, 0.08);
+  --fl-border: rgba(15, 14, 12, 0.13);
+  --fl-border-strong: rgba(15, 14, 12, 0.20);
+
+  --fl-accent: #2d6fc5;
+
+  /* Notion 인라인 톤 (플랫) */
+  --fl-tint-gray: #777570;   --fl-tint-gray-bg: #f1f0ee;
+  --fl-tint-orange: #c46c1f; --fl-tint-orange-bg: #faebdd;
+  --fl-tint-yellow: #b58b18; --fl-tint-yellow-bg: #fbf3db;
+  --fl-tint-green: #2f8a5d;  --fl-tint-green-bg: #ddedea;
+  --fl-tint-blue: #2d6dc4;   --fl-tint-blue-bg: #ddebf1;
+  --fl-tint-purple: #6f4ec9; --fl-tint-purple-bg: #eae4f2;
+  --fl-tint-pink: #c34e8b;   --fl-tint-pink-bg: #f4dfeb;
+  --fl-tint-red: #c84c47;    --fl-tint-red-bg: #fbe4e4;
+
+  --fl-shadow-sm: 0 1px 3px rgba(15, 14, 12, 0.06), 0 1px 2px rgba(15, 14, 12, 0.04);
+  --fl-shadow-md: 0 2px 4px rgba(15, 14, 12, 0.04), 0 6px 16px rgba(15, 14, 12, 0.08);
+  color-scheme: light;
+}
+
+/* ---- DARK 값 (한 곳에 정의) ---- */
+.fl-dark, .folio.fl-dark {
+  --fl-bg: #191918;
+  --fl-surface: #202020;
+  --fl-surface-2: #1c1c1b;
+  --fl-surface-3: #2a2a28;
+  --fl-hover: rgba(255, 253, 248, 0.055);
+  --fl-active: rgba(255, 253, 248, 0.13);
+
+  --fl-text: #e9e7e2;
+  --fl-text-secondary: #c2bfb7;
+  --fl-text-tertiary: #908d85;
+  --fl-text-quaternary: #6f6b62;
+  --fl-text-link: #8aa9ff;
+
+  --fl-border-subtle: rgba(255, 253, 248, 0.07);
+  --fl-border: rgba(255, 253, 248, 0.12);
+  --fl-border-strong: rgba(255, 253, 248, 0.20);
+
+  --fl-accent: #8aa9ff;
+
+  --fl-tint-gray: #b0aca5;   --fl-tint-gray-bg: rgba(155,152,145,0.16);
+  --fl-tint-orange: #e3a468; --fl-tint-orange-bg: rgba(224,124,42,0.18);
+  --fl-tint-yellow: #e0c05a; --fl-tint-yellow-bg: rgba(203,145,38,0.18);
+  --fl-tint-green: #6fc193;  --fl-tint-green-bg: rgba(47,138,93,0.20);
+  --fl-tint-blue: #7aa0e8;   --fl-tint-blue-bg: rgba(45,109,196,0.22);
+  --fl-tint-purple: #b39bf5; --fl-tint-purple-bg: rgba(111,78,201,0.24);
+  --fl-tint-pink: #e08fbd;   --fl-tint-pink-bg: rgba(195,78,139,0.20);
+  --fl-tint-red: #e08580;    --fl-tint-red-bg: rgba(200,76,71,0.20);
+
+  --fl-shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --fl-shadow-md: 0 2px 4px rgba(0,0,0,0.4), 0 6px 16px rgba(0,0,0,0.5);
+  color-scheme: dark;
+}
+
+/* 1순위: 시스템 설정 자동 반영 (명시적 라이트 지정이 없을 때) */
+@media (prefers-color-scheme: dark) {
+  html:not([data-nl-theme="light"]) .folio { color-scheme: dark; }
+}
+
+/* ============================================================================
+   레이아웃
+   ============================================================================ */
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--fl-bg);
+  color: var(--fl-text);
+  font-family: var(--fl-font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  transition: background var(--fl-dur-normal), color var(--fl-dur-normal);
+}
+::selection { background: var(--fl-tint-blue-bg); color: var(--fl-text); }
+
+.nl-page { max-width: 740px; margin: 0 auto; padding: 28px 28px 120px; }
+
+/* ---- 헤더 (그라데이션 없는 노션 페이지) ---- */
+.nl-icon { font-size: 58px; line-height: 1; }
+.nl-eyebrow {
+  margin-top: 18px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.04em; color: var(--fl-text-tertiary);
+  display: flex; align-items: center; gap: 8px;
+}
+.nl-eyebrow__chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--fl-tint-blue-bg); color: var(--fl-tint-blue);
+  font-size: 11px; font-weight: 600;
+}
+.nl-title {
+  font-size: 42px; font-weight: 800; line-height: 1.12;
+  letter-spacing: -0.025em; margin: 14px 0 0; word-break: keep-all;
+}
+.nl-title b { color: var(--fl-accent); font-weight: 800; }
+.nl-lead {
+  font-size: 17px; line-height: 1.65; color: var(--fl-text-secondary);
+  margin: 14px 0 0; max-width: 58ch; word-break: keep-all;
+}
+
+/* ---- 메타 행 ---- */
+.nl-meta {
+  margin-top: 22px; display: flex; flex-wrap: wrap; gap: 6px 18px;
+  font-size: 12.5px; color: var(--fl-text-tertiary);
+  padding-bottom: 22px; border-bottom: 1px solid var(--fl-border-subtle);
+}
+.nl-meta span b { color: var(--fl-text-secondary); font-weight: 600; }
+
+/* ---- 인사 콜아웃 (플랫 노션 callout) ---- */
+.nl-greet {
+  display: flex; gap: 12px; align-items: flex-start;
+  margin-top: 22px; padding: 14px 16px;
+  background: var(--fl-surface-2); border: 1px solid var(--fl-border-subtle);
+  border-radius: var(--fl-radius-md);
+  font-size: 14px; line-height: 1.65; color: var(--fl-text-secondary);
+}
+.nl-greet__icon { font-size: 18px; flex-shrink: 0; line-height: 1.5; }
+.nl-greet b { color: var(--fl-text); font-weight: 700; }
+
+/* ---- 탭 바 (doc-lenses 스타일, 노션 플랫) ---- */
+.nl-tabs {
+  position: sticky; top: 44px; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 30px; padding: 12px 0;
+  background: var(--fl-bg); border-bottom: 1px solid var(--fl-border-subtle);
+}
+.nl-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--fl-text-secondary);
+  background: var(--fl-surface); border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius-md); padding: 7px 13px;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--fl-dur-fast), color var(--fl-dur-fast), border-color var(--fl-dur-fast);
+}
+.nl-tab:hover { background: var(--fl-hover); color: var(--fl-text); }
+.nl-tab[aria-selected="true"] {
+  background: var(--fl-text); color: var(--fl-bg);
+  border-color: var(--fl-text); font-weight: 600;
+}
+.nl-tab__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tc, var(--fl-text-tertiary)); flex-shrink: 0;
+}
+.nl-tab[aria-selected="true"] .nl-tab__dot { background: var(--fl-bg); opacity: 0.85; }
+
+/* ---- 패널 ---- */
+@keyframes nl-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.nl-panel { animation: nl-fade 0.32s var(--fl-ease-out); padding-top: 28px; }
+
+/* 주제별 색 (톤 변수 매핑) */
+.nl-tint-blue   { --tc: var(--fl-tint-blue);   --tcb: var(--fl-tint-blue-bg); }
+.nl-tint-purple { --tc: var(--fl-tint-purple); --tcb: var(--fl-tint-purple-bg); }
+.nl-tint-green  { --tc: var(--fl-tint-green);  --tcb: var(--fl-tint-green-bg); }
+.nl-tint-orange { --tc: var(--fl-tint-orange); --tcb: var(--fl-tint-orange-bg); }
+.nl-tint-pink   { --tc: var(--fl-tint-pink);   --tcb: var(--fl-tint-pink-bg); }
+
+.nl-panel__head { display: flex; align-items: center; gap: 10px; }
+.nl-panel__icon { font-size: 22px; line-height: 1; }
+.nl-panel__title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.nl-panel__desc { margin: 8px 0 0; color: var(--fl-text-tertiary); font-size: 13.5px; }
+
+/* 선정 기준 (왜 이 소식인가 — 기본 접힘) */
+.nl-criteria { margin-top: 12px; border: 1px solid var(--fl-border-subtle); border-radius: var(--fl-radius-md); background: var(--fl-surface-2); padding: 0 14px; }
+.nl-criteria summary { cursor: pointer; list-style: none; padding: 10px 0; font-size: 12.5px; font-weight: 600; color: var(--fl-text-secondary); display: flex; align-items: center; gap: 6px; }
+.nl-criteria summary::-webkit-details-marker { display: none; }
+.nl-criteria summary::after { content: "▸"; margin-left: auto; color: var(--fl-text-tertiary); font-size: 11px; }
+.nl-criteria[open] summary::after { content: "▾"; }
+.nl-criteria__body { padding: 0 0 12px; font-size: 13px; line-height: 1.7; color: var(--fl-text-secondary); }
+.nl-criteria__body b { color: var(--fl-text); }
+
+/* ---- 핵심 하이라이트 (주제당 1개) ---- */
+.nl-hl {
+  margin-top: 18px; padding: 22px 24px;
+  background: var(--tcb); border: 1px solid var(--tc);
+  border-radius: var(--fl-radius-lg);
+}
+.nl-hl__kicker {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--tc); margin-bottom: 12px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--fl-bg); border: 1px solid var(--tc);
+}
+.nl-hl__title { font-size: 23px; font-weight: 800; line-height: 1.3; letter-spacing: -0.015em; margin: 0; word-break: keep-all; color: var(--fl-text); }
+.nl-hl__summary { margin: 12px 0 0; font-size: 15px; line-height: 1.7; color: var(--fl-text-secondary); }
+
+/* ---- 더 읽을거리 ---- */
+.nl-more__label {
+  margin: 30px 0 14px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.04em; color: var(--fl-text-tertiary);
+  display: flex; align-items: center; gap: 8px;
+}
+.nl-more__label::after { content: ""; flex: 1; height: 1px; background: var(--fl-border-subtle); }
+
+.nl-grid { display: grid; gap: 12px; }
+.nl-card {
+  background: var(--fl-surface); border: 1px solid var(--fl-border-subtle);
+  border-radius: var(--fl-radius-lg); padding: 16px 18px;
+  transition: border-color var(--fl-dur-fast), box-shadow var(--fl-dur-fast);
+}
+.nl-card:hover { border-color: var(--fl-border); box-shadow: var(--fl-shadow-sm); }
+.nl-card__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--fl-text-tertiary); }
+.nl-card__dot { width: 3px; height: 3px; border-radius: 50%; background: var(--fl-text-quaternary); }
+.nl-card__title { font-size: 16.5px; font-weight: 700; line-height: 1.4; letter-spacing: -0.008em; margin: 9px 0 0; word-break: keep-all; }
+.nl-card__summary { margin: 8px 0 0; color: var(--fl-text-secondary); font-size: 13.5px; line-height: 1.65; }
+
+/* 자세히 보기 (긴 글 대응 — 기본 접힘) */
+.nl-more-btn {
+  margin-top: 9px; display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 2px 0; cursor: pointer; font-family: inherit;
+  font-size: 13px; font-weight: 600; color: var(--tc, var(--fl-accent));
+}
+.nl-more-btn:hover .nl-more-btn__t { text-decoration: underline; }
+.nl-more-btn__chev { display: inline-block; font-size: 10px; transition: transform var(--fl-dur-fast); }
+.nl-more-btn[aria-expanded="true"] .nl-more-btn__chev { transform: rotate(180deg); }
+.nl-detail {
+  display: none; margin-top: 10px; padding: 12px 14px;
+  background: var(--fl-surface-2); border-radius: var(--fl-radius);
+  font-size: 13.5px; line-height: 1.7; color: var(--fl-text-secondary); word-break: keep-all;
+}
+.nl-detail.open { display: block; animation: nl-fade 0.25s var(--fl-ease-out); }
+.nl-detail p { margin: 0 0 8px; }
+.nl-detail p:last-child { margin: 0; }
+.nl-hl .nl-detail { background: var(--fl-bg); }
+
+/* 태그 */
+.nl-tag {
+  display: inline-flex; align-items: center;
+  padding: 1px 9px; height: 21px; border-radius: var(--fl-radius-sm);
+  background: var(--tcb, var(--fl-tint-gray-bg)); color: var(--tc, var(--fl-tint-gray));
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+
+/* "나를 위한 한 줄" — 개인화 시그니처 (플랫, 좌측 컬러 보더) */
+.nl-foryou {
+  margin-top: 13px; display: flex; gap: 10px;
+  padding: 10px 13px; background: var(--fl-surface-2);
+  border-left: 3px solid var(--tc, var(--fl-accent));
+  border-radius: 0 var(--fl-radius) var(--fl-radius) 0;
+  font-size: 13px; line-height: 1.6;
+}
+.nl-foryou__label { flex-shrink: 0; font-weight: 700; color: var(--tc, var(--fl-accent)); font-size: 11px; letter-spacing: 0.03em; padding-top: 1px; }
+.nl-foryou__text { color: var(--fl-text); }
+.nl-foryou--lg { margin-top: 16px; background: var(--fl-bg); }
+
+/* ---- 푸터 ---- */
+.nl-footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--fl-border-subtle); color: var(--fl-text-tertiary); font-size: 13px; line-height: 1.7; }
+.nl-footer__brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.nl-footer__logo { width: 30px; height: 30px; border-radius: 8px; background: var(--fl-accent); display: flex; align-items: center; justify-content: center; color: var(--fl-bg); font-weight: 800; font-size: 14px; }
+.nl-footer__name { color: var(--fl-text); font-weight: 700; font-size: 14px; }
+.nl-footer__sub { font-size: 11.5px; }
+.nl-footer__next { margin-top: 14px; padding: 13px 16px; background: var(--fl-surface-2); border-radius: var(--fl-radius-md); color: var(--fl-text-secondary); }
+.nl-footer__disc { margin-top: 14px; font-size: 11.5px; color: var(--fl-text-quaternary); }
+
+/* ---- 상단 네비게이션 ---- */
+.topnav {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px;
+  background: color-mix(in srgb, var(--fl-bg) 86%, transparent);
+  -webkit-backdrop-filter: saturate(1.5) blur(8px); backdrop-filter: saturate(1.5) blur(8px);
+  border-bottom: 1px solid var(--fl-border-subtle);
+}
+.topnav__brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--fl-text); }
+.topnav__logo { width: 24px; height: 24px; border-radius: 6px; background: var(--fl-accent); color: var(--fl-bg); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.topnav__spacer { flex: 1; }
+.topnav__link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px;
+  border-radius: var(--fl-radius-md); font-size: 13px; font-weight: 500; color: var(--fl-text-secondary);
+  transition: background var(--fl-dur-fast), color var(--fl-dur-fast);
+}
+.topnav__link:hover { background: var(--fl-hover); color: var(--fl-text); }
+.topnav__link--active { background: var(--fl-active); color: var(--fl-text); }
+
+/* ---- 테마 토글 (네비 내 단일 아이콘) ---- */
+.nl-theme {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius-md); color: var(--fl-text-secondary); cursor: pointer;
+  transition: background var(--fl-dur-fast), color var(--fl-dur-fast), border-color var(--fl-dur-fast);
+}
+.nl-theme:hover { background: var(--fl-hover); color: var(--fl-text); }
+.nl-theme svg { width: 17px; height: 17px; }
+.nl-ico-sun, .nl-ico-moon { display: none; }
+body:not(.fl-dark) .nl-ico-sun { display: block; }
+body.fl-dark .nl-ico-moon { display: block; }
+
+/* ---- 출처 링크 ---- */
+.nl-src {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--fl-text-tertiary); text-decoration: none;
+  border-bottom: 1px dashed var(--fl-border); transition: color var(--fl-dur-fast), border-color var(--fl-dur-fast);
+}
+.nl-src:hover { color: var(--fl-accent); border-bottom-color: var(--fl-accent); }
+.nl-src__ext { font-size: 0.85em; opacity: 0.7; }
+.nl-hl__src {
+  margin-top: 14px; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; color: var(--fl-text-tertiary);
+}
+.nl-hl__src a { color: var(--tc, var(--fl-accent)); border-bottom: 1px dashed var(--tc, var(--fl-accent)); text-decoration: none; padding-bottom: 1px; }
+.nl-hl__src a:hover { opacity: 0.8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nl-panel { animation: none; }
+  body { transition: none; }
+}
+
+/* ---- 모바일 / 외부 접속 최적화 ---- */
+@media (max-width: 640px) {
+  .nl-page { padding: 20px 16px 96px; }
+  .topnav { padding: 8px 14px; gap: 8px; }
+  .topnav__brand-t { display: none; }
+  .topnav__link { padding: 6px 10px; }
+  .nl-icon { font-size: 48px; }
+  .nl-title { font-size: 28px; }
+  .nl-lead { font-size: 15.5px; }
+  .nl-hl { padding: 18px 18px; }
+  .nl-hl__title { font-size: 19px; }
+  .nl-hl__summary { font-size: 14px; }
+  .nl-card { padding: 15px 16px; }
+
+  /* 탭: 줄바꿈 대신 화면 끝까지 닿는 가로 스크롤 스트립 */
+  .nl-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-left: -16px; margin-right: -16px;
+    padding: 11px 16px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nl-tabs::-webkit-scrollbar { display: none; }
+  .nl-tab { scroll-snap-align: start; flex: 0 0 auto; padding: 9px 14px; }
+
+  /* 터치 타깃 확대 */
+  .nl-theme { width: 40px; height: 40px; }
+}
+
+/* 모바일에서 가로 스크롤로 잘린 본문 방지 */
+.nl-card__title, .nl-hl__title, .nl-title { overflow-wrap: anywhere; }
+</style>
+</head>
+
+<body class="folio">
+
+<!-- 상단 네비게이션 — 어느 호에서나 전체 목록으로 이동 -->
+<header class="topnav">
+  <a class="topnav__brand" href="../index.html">
+    <span class="topnav__logo">준</span>
+    <span class="topnav__brand-t">메이커준의 AI 학습 허브</span>
+  </a>
+  <span class="topnav__spacer"></span>
+  <a class="topnav__link topnav__link--active" href="../index.html">📰 뉴스레터</a>
+  <a class="topnav__link" href="../learn/index.html">📚 깊이 읽기</a>
+  <!-- 테마 토글 — 기본은 시스템 설정 따름, 클릭 시 라이트/다크 고정 -->
+  <button class="nl-theme" id="themeBtn" type="button" aria-label="라이트/다크 전환" title="라이트/다크 전환">
+    <svg class="nl-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    <svg class="nl-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+</header>
+
+<main class="nl-page">
+  <div id="header"></div>
+  <nav class="nl-tabs" id="tabs" role="tablist" aria-label="관심사 주제"></nav>
+  <section id="panel" role="tabpanel"></section>
+  <div id="footer"></div>
+</main>
+
+<script>
+/* ============================================================================
+   뉴스레터 데이터 — 이 객체만 교체하면 매주 새 호가 발행됩니다.
+   각 주제(topic) = 탭 하나. highlight = 그 주제의 핵심 1건. articles = 더 읽을거리.
+   tint: blue | purple | green | orange | pink
+   ============================================================================ */
+const NEWSLETTER = {
+  "meta": {
+    "icon": "🗞️",
+    "edition": "Vol.01",
+    "cadence": "주간",
+    "date": "2026년 9월 18일 (금)",
+    "curator": "AI 큐레이션 에이전트 (Claude Cowork)",
+    "reader": "메이커준",
+    "title": [
+      "데일리 ",
+      "AI 뉴스레터"
+    ],
+    "lead": "지난 한 주간의 AI 소식을 관심사 탭 3개로 나눠 정리했습니다. 탭마다 '딱 하나의 핵심'을 크게 담고, '자세히 보기'에는 배경과 활용 팁을 조금 더 풀어 설명했어요.",
+    "greeting": "안녕하세요! 창간호입니다. ① 지난 24시간의 AI 소식 ② 비개발자가 바로 써먹는 AI 활용 ③ 요즘 화제인 AI 도구, 이렇게 세 탭으로 나눠 담았어요. 각 탭 맨 위 큰 카드가 <b>그 탭의 핵심</b>이고, '자세히 보기'엔 배경과 활용 팁까지 풀어 설명했습니다."
+  },
+  "topics": [
+    {
+      "id": "news",
+      "label": "AI 최신 소식",
+      "icon": "📰",
+      "tint": "blue",
+      "desc": "발행 기준 지난 24시간의 주요 AI 소식.",
+      "criteria": "발행 시각 기준 <b>지난 24시간</b>(부족하면 최대 48시간)에 나온 소식 중에서 ① 영향 범위 ② 새로움·중요도 ③ 출처 신뢰도(공식·1차 보도) ④ 실용성 ⑤ 관심사 적합도 순으로 점수를 매겨 가장 높은 것을 골랐어요. 루머·광고·중복은 제외합니다.",
+      "highlight": {
+        "kicker": "오늘의 핵심",
+        "title": "스페인, AI 에이전트가 단독 실행한 첫 개인정보 유출 사고 접수",
+        "summary": "스페인 개인정보보호청(AEPD)이 AI 에이전트가 처음부터 끝까지 스스로 실행한 것으로 보이는 개인정보 유출 사고를 접수했다고 밝혔습니다. 제3자가 AI 에이전트를 도구로 삼아 로그인 정보 탈취, 취약점 탐색, 개인정보 접근까지 여러 단계 공격을 사람의 지속적인 개입 없이 연쇄적으로 실행한 사례입니다. 실제 개인정보와 청구서 등이 열람·수정된 것으로 파악됐으며, AEPD는 이를 '위협 지형의 질적 전환'으로 규정했습니다. AI 에이전트가 실험실 밖 실제 환경에서 공격을 자율 수행한 최초 사례로 보고되며, 조사는 현재 진행 중입니다.",
+        "detail": "<p>그동안 AI 에이전트가 관련된 보안 사고는 대부분 AI 기업의 실험 환경에서 모델이 이탈하거나 오작동한 사례였습니다. 이번 건은 다릅니다. 제3자가 AI 에이전트를 '공격 도구'로 사용해, 로그인 정보 확보부터 시스템 취약점 탐색, 개인정보 접근·수정까지 여러 단계를 사람이 매 순간 지시하지 않아도 알아서 이어 붙였습니다. AEPD는 이를 사람이 직접 해킹하던 방식에서 AI가 공격 전체를 대행하는 방식으로의 '질적 전환'이라고 설명했습니다.</p><p>구체적인 피해 기업명과 유출 규모는 아직 공개되지 않았고, AEPD 조사도 진행형입니다. 다만 이번 사고는 '수상한 링크를 조심하라'던 기존 보안 상식만으로는 AI 에이전트 시대의 위협에 충분히 대비하기 어려울 수 있다는 신호입니다. 온라인 계정에 2단계 인증을 켜두고, 낯선 접근 알림이 오면 바로 확인하는 습관이 이전보다 더 중요해졌습니다.</p>",
+        "source": "SecurityWeek",
+        "url": "https://www.securityweek.com/first-agentic-ai-data-breach-reported-to-spanish-regulator/",
+        "published": "2026-09-16",
+        "foryou": "은행·이메일 계정에 2단계 인증이 꺼져 있다면, 오늘 하나만이라도 켜두세요."
+      },
+      "articles": [
+        {
+          "tag": "소식",
+          "source": "Tech Times",
+          "url": "https://www.techtimes.com/articles/327645/20260917/house-voted-417-3-make-data-centers-pay-electricity-costs-states-can-still-say-no.htm",
+          "time": "1일 전",
+          "published": "2026-09-17",
+          "title": "美 하원, AI 데이터센터發 전기요금 인상 막는 법안 417대3 가결",
+          "summary": "미국 하원이 대형 AI 데이터센터가 유발한 전력망 증설 비용을 데이터센터 사업자가 직접 부담하도록 하는 '요금 지불자 보호법(Ratepayer Protection Act)'을 찬성 417표, 반대 3표로 통과시켰습니다. 100메가와트 이상 전력을 쓰는 대형 데이터센터가 대상이며, 계약을 해지해도 이미 지어진 설비 비용은 계속 책임지도록 했습니다. 다만 최종 적용 여부는 주(州) 정부 판단에 달려 있어, 즉각적인 요금 인하로 바로 이어지지는 않습니다.",
+          "detail": "<p>미국 전력 소비에서 데이터센터가 차지하는 비중은 현재 약 4.4%지만, 2028년에는 6.7~12%까지 늘어날 수 있다는 전망이 나옵니다. 이 때문에 일부 지역에서는 2030년까지 가정용 전기요금이 15~40% 오를 수 있다는 분석도 있었습니다. 이번 법안은 그 비용을 일반 가정이 아니라 AI 데이터센터 사업자가 지도록 못 박는 첫 연방 차원의 시도입니다.</p><p>다만 법안은 주 정부의 공공요금위원회가 이 기준을 반드시 '검토'하도록 할 뿐, '채택'을 강제하지는 않습니다. 즉 각 주가 2년 안에 관련 절차를 열어야 하지만, 최종적으로 받아들이지 않을 수도 있다는 뜻입니다. 내가 사는 지역 전기요금이 실제로 어떻게 바뀌는지는 앞으로 주별 결정을 지켜봐야 확인할 수 있습니다.</p>",
+          "foryou": "전기요금 고지서가 유난히 많이 올랐다면, 우리 지역 데이터센터 관련 요금 정책 기사를 검색해 보세요."
+        },
+        {
+          "tag": "소식",
+          "source": "Gizmochina",
+          "url": "https://www.gizmochina.com/2026/09/16/openai-retiring-gpt-5-5-on-october-14-you-may-need-to-update-your-workflow/",
+          "time": "2일 전",
+          "published": "2026-09-16",
+          "title": "오픈AI, 10월 14일 'GPT-5.5' 퇴역…챗GPT는 자동 전환",
+          "summary": "오픈AI가 챗GPT·챗GPT Work·Codex에서 GPT-5.5 모델을 2026년 10월 14일 퇴역시킨다고 공지했습니다. 일반 챗GPT 사용자는 별도 조치 없이 대화가 새 기본 모델로 자동 전환되지만, 저장된 설정이나 자동화 스크립트를 GPT-5.5로 고정해 둔 개발자·업무용 사용자는 GPT-5.6 Sol 등으로 직접 교체해야 합니다.",
+          "detail": "<p>AI 모델은 신제품이 나올 때마다 이전 모델이 조용히 '단종'되곤 합니다. 이번에도 오픈AI는 GPT-5.5를 내리고 그 자리를 새 모델로 채웁니다. 일반 사용자 입장에서는 어느 날 챗GPT의 말투나 답변 스타일이 살짝 달라졌다고 느낄 수 있는 정도이지, 앱을 다시 설정하거나 로그인을 새로 할 필요는 없습니다.</p><p>영향을 받는 쪽은 주로 업무 자동화·커스텀 에이전트·스크립트에 모델명을 'GPT-5.5'로 못박아 둔 경우입니다. 회사에서 챗GPT를 업무 자동화에 연결해 쓰고 있다면, 10월 14일 전에 담당자가 설정을 확인했는지 한 번 물어보는 정도면 충분합니다.</p>",
+          "foryou": "그냥 챗GPT로 대화만 하신다면 신경 쓸 일은 없어요 — 자동으로 바뀝니다."
+        }
+      ]
+    },
+    {
+      "id": "everyone",
+      "label": "비개발자를 위한 AI 활용",
+      "icon": "🧭",
+      "tint": "green",
+      "desc": "비개발자가 오늘 바로 활용해볼 만한 AI 기능과 안전 정보.",
+      "criteria": "지난 한 주 소식 중에서 <b>비개발자가 오늘 바로 알아두거나 켜볼 수 있는 것</b>(새 기능·활용법·안전 관련 업데이트)을 같은 다섯 가지 기준(영향 범위·새로움·출처 신뢰도·실용성·관심사 적합도)으로 골랐어요.",
+      "highlight": {
+        "kicker": "오늘의 핵심",
+        "title": "클로드 채팅과 Cowork가 하나로 — 대화만으로 문서·슬라이드까지",
+        "summary": "앤트로픽이 클로드 채팅과 업무용 기능인 Cowork, 그리고 아티팩트를 하나의 화면으로 합쳤습니다. 이제 어떤 탭을 써야 할지 고민할 필요 없이, 요청 내용에 맞춰 클로드가 알아서 적절한 기능으로 작업을 연결합니다. 대화창에서 바로 문서를 함께 편집하고, 슬라이드를 만들어 PDF나 파워포인트 파일로 내보낼 수 있게 됐습니다. 우선 Pro·Max 요금제부터 웹·데스크톱·모바일에 순차 적용되고, 무료 요금제는 이후 확대될 예정입니다.",
+        "detail": "<p>지금까지는 '채팅으로 물어볼까, Cowork로 시킬까'를 사용자가 먼저 판단해야 했습니다. 이번 업데이트로 그 구분이 사라져, 하고 싶은 말을 하면 클로드가 알아서 문서 작성이 필요한지, 파일을 다뤄야 하는지 판단해 처리합니다. 비개발자에게는 '어느 도구를 배워야 하나'라는 진입 장벽이 하나 줄어드는 셈입니다.</p><p>예를 들어 '이번 주 팀 회의 내용을 정리해서 발표용 슬라이드로 만들어줘, 파워포인트로 내려받게 해줘'라고 하면 슬라이드를 만들고 .pptx나 PDF로 바로 내보낼 수 있습니다. 만든 문서는 링크로 공유해 휴대폰에서도 함께 수정할 수 있습니다. 다만 아직 기능이 순차 적용 중이라, 내 요금제에 언제 뜨는지는 앱 안내를 확인하는 게 좋습니다.</p>",
+        "source": "TechCrunch",
+        "url": "https://techcrunch.com/2026/09/16/anthropic-merges-claude-chat-and-cowork-in-one-interface/",
+        "published": "2026-09-16",
+        "foryou": "다음에 자료 정리할 일이 생기면, 클로드에게 '슬라이드로 만들어서 PPT로 내려줘'라고 그대로 말해보세요."
+      },
+      "articles": [
+        {
+          "tag": "활용 사례",
+          "source": "TechCrunch",
+          "url": "https://techcrunch.com/2026/09/16/your-ai-agents-can-now-control-your-google-home-devices/",
+          "time": "2일 전",
+          "published": "2026-09-16",
+          "title": "구글 홈, AI 비서에게 스마트홈 열쇠 내줬다",
+          "summary": "구글이 '구글 홈 MCP'를 공개해 클로드·챗GPT 같은 AI 에이전트가 자연어로 구글 홈 기기를 직접 제어할 수 있게 됐습니다. 네스트 카메라 요약 확인, 조명·온도 조절, 스마트홈 대시보드 만들기까지 가능합니다. 다만 현재는 미국 기준 월 20달러 '구글 홈 프리미엄 어드밴스드' 요금제와 별도 설정이 필요합니다.",
+          "detail": "<p>지금까지 스마트홈 기기는 전용 앱을 하나하나 열어 조작해야 했습니다. 이번 연동으로 평소 쓰던 AI 비서 대화창에서 '거실 조명 어둡게 해줘', '오늘 낮에 현관 카메라에 뭐가 찍혔는지 요약해줘'처럼 말로 시키는 것이 가능해집니다.</p><p>다만 지금은 구글 클라우드 프로젝트를 만들고 MCP 설정값을 AI 에이전트에 연결하는 등 초기 설정이 다소 번거롭습니다. 스마트홈 기기를 이미 쓰고 있다면 구글 홈 개발자 센터의 설정 가이드를 먼저 확인하고, 카메라·현관 접근 권한처럼 민감한 항목은 신중하게 허용하는 것이 좋습니다.</p>",
+          "foryou": "구글 홈 기기를 쓰고 있다면, 이번 주말에 설정 가이드만 한 번 훑어보세요."
+        },
+        {
+          "tag": "활용 사례",
+          "source": "아이뉴스24",
+          "url": "https://m.inews24.com/v/2006541",
+          "time": "1일 전",
+          "published": "2026-09-17",
+          "title": "삼성 '원 UI 9', 통화 중 AI 음성 변조 실시간으로 잡아낸다",
+          "summary": "삼성전자가 갤럭시 S26 시리즈부터 적용되는 '원 UI 9' 업데이트에 보이스피싱 방지 기능을 추가했습니다. 통화 상대방의 목소리가 AI로 변조됐는지 온디바이스에서 분석해, 조작 징후가 감지되면 팝업·알림음·진동으로 실시간 경고합니다. 사용자가 따로 설정할 필요 없이 통화 중 자동으로 작동하며, 우선 국내에 먼저 적용됩니다.",
+          "detail": "<p>AI 음성 합성 기술이 좋아지면서, 가족이나 지인 목소리를 흉내 낸 보이스피싱이 점점 정교해지고 있습니다. 이번 기능은 통화 음성을 실시간으로 분석해, 사람 목소리가 아니라 AI로 만들어졌을 가능성이 있으면 화면과 진동으로 바로 알려주는 방식입니다.</p><p>기기가 자동으로 판단해 주는 기능이라 사용자가 미리 켜두는 것 외에 특별히 할 일은 없습니다. 다만 이런 기능이 있다고 완전히 안심하기보다는, 통화 중 급하게 돈을 보내달라는 요청을 받으면 일단 끊고 본인이 직접 전화해 확인하는 습관은 여전히 필요합니다.</p>",
+          "foryou": "부모님 폰이 갤럭시 S26이라면, 이 기능이 켜져 있는지 이번 주에 전화 한 통으로 확인해 드려보세요."
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "요즘 화제인 AI 도구",
+      "icon": "🛠️",
+      "tint": "orange",
+      "desc": "이번 주 여러 매체가 함께 주목한 화제의 AI 도구.",
+      "criteria": "지난 한 주 동안 여러 매체에서 함께 다룬 <b>화제의 AI 도구</b> 소식을 같은 다섯 가지 기준으로 골랐어요. 실제로 써볼 수 있는 도구를 우선했습니다.",
+      "highlight": {
+        "kicker": "오늘의 핵심",
+        "title": "제미나이 3.8 Live — 말하는 동안 '생각'까지 하는 음성 AI",
+        "summary": "구글이 실시간 음성 대화에 특화된 AI 모델 '제미나이 3.8 Live'와, 답하면서 동시에 다단계 추론까지 수행하는 '3.8 Live Extended Thinking'을 공개했습니다. 음성 품질 평가에서 상위권을 차지했고, 97개 언어를 대화 중간에도 자동으로 알아듣습니다. 구글 검색의 'Search Live'와 제미나이 앱 음성 모드에도 순차 적용되어, 일반 사용자도 더 자연스러운 음성 대화를 체험할 수 있습니다.",
+        "detail": "<p>기존 음성 AI는 대개 '듣고 → 멈춰서 생각하고 → 대답'하는 방식이라 대화가 뚝뚝 끊기는 느낌이 있었습니다. 이번 모델은 답을 말하면서 동시에 다음 단계를 계산하도록 설계돼, 실제 사람과 통화하듯 자연스러운 흐름을 목표로 합니다. 화면을 보여주며 실시간으로 질문하는 것도 가능해, 낯선 표지판을 카메라로 비추고 바로 물어보는 식의 활용도 기대할 수 있습니다.</p><p>다만 이 모델 자체는 개발자용 API(분당 과금) 형태로 먼저 열렸고, 일반 사용자는 구글 검색의 Search Live나 제미나이 앱을 통해 순차적으로 만나게 됩니다. 지금 당장 모든 기기에서 쓸 수 있는 건 아니므로, 내 지역·앱에 적용됐는지는 업데이트 알림을 확인하는 게 좋습니다.</p>",
+        "source": "MarkTechPost",
+        "url": "https://www.marktechpost.com/2026/09/15/google-releases-gemini-3-8-live-and-3-8-live-extended-thinking-for-production-grade-voice-agents/",
+        "published": "2026-09-15",
+        "foryou": "제미나이 앱에 음성 모드가 있다면, 이번 주 한 번 길게 말로 대화해 보고 예전과 뭐가 다른지 느껴보세요."
+      },
+      "articles": [
+        {
+          "tag": "화제 도구",
+          "source": "Gizmodo",
+          "url": "https://gizmodo.com/ai-song-generator-suno-releases-new-model-developed-with-warner-music-2000809180",
+          "time": "9일 전",
+          "published": "2026-09-09",
+          "title": "AI 작곡 도구 수노, 워너뮤직과 손잡고 'v6' 출시",
+          "summary": "AI 음악 생성 서비스 수노(Suno)가 워너뮤직그룹·BMG·빌리브와 함께 개발한 새 모델 'v6'를 출시했습니다. 워너뮤직이 제기했던 저작권 소송을 합의로 마무리하면서, 소속 아티스트가 원할 경우 자신의 음악·목소리를 학습에 제공하고 그 대가로 로열티를 받는 구조를 처음 만들었습니다. 기존 곡의 일부를 수정하거나 여러 곡을 매시업하고, 사진·영상·일기 등을 바탕으로 새 곡을 만드는 기능이 추가됐습니다.",
+          "detail": "<p>그동안 AI 작곡 도구는 '허락 없이 음악을 학습했다'는 저작권 논란이 꾸준히 따라다녔습니다. 이번 파트너십은 음반사가 직접 참여해 로열티를 나누는 구조를 만들었다는 점에서, AI 음악 서비스가 합법적인 궤도에 올라서는 사례로 주목받고 있습니다.</p><p>정확한 로열티 배분 방식은 아직 음반사별로 정해지는 중이라 공개되지 않았습니다. 영상에 배경음악이 필요하다면, 저작권 문제에서 비교적 자유로운 이런 라이선스 기반 AI 음악 도구를 살펴볼 만합니다. 다만 상업적으로 쓰기 전에는 이용 약관의 라이선스 범위를 직접 확인하는 게 안전합니다.</p>",
+          "foryou": "영상에 넣을 배경음악이 필요할 때, 수노 v6로 짧게 시험 삼아 만들어 보세요."
+        },
+        {
+          "tag": "화제 도구",
+          "source": "Semafor",
+          "url": "https://www.semafor.com/article/09/17/2026/video-ai-company-pika-offers-tool-to-speed-up-ai-video-creation",
+          "time": "1일 전",
+          "published": "2026-09-17",
+          "title": "AI 영상 도구 파이카, 긴 프롬프트 없이 영상 만드는 신기능 공개",
+          "summary": "AI 영상 생성 서비스 파이카(Pika)가 복잡한 프롬프트 작성 없이도 영상을 만들 수 있는 새 도구를 선보였습니다. 원하는 내용을 간단히 입력하면 장면별로 나뉜 편집 가능한 구성안을 자동으로 만들어 주고, 장면마다 어떤 AI 모델을 쓸지도 알아서 골라줍니다. 조명을 바꾸거나 등장인물의 의상을 교체하는 보조 기능도 함께 출시됐으며, 경쟁 서비스 대비 절반 수준의 가격을 내세우고 있습니다.",
+          "detail": "<p>그동안 AI 영상 도구는 원하는 장면을 얻으려면 문단 단위의 긴 프롬프트를 직접 써야 해서, 영상 편집자가 아니면 진입 장벽이 높았습니다. 이번 도구는 '무엇을 만들고 싶은지'만 간단히 입력하면 장면별 구성안을 먼저 보여주고, 사람이 그 위에서 다듬는 방식으로 바뀝니다.</p><p>파이카 측은 이 방식이 창작자의 '만들었다는 느낌'을 지켜주는 것이 목표라고 설명합니다. 짧은 영상을 만들 때 처음부터 끝까지 AI에 맡기기보다, 이렇게 장면 단위로 검토하며 만드는 도구가 결과물 품질과 저작권 관리 양쪽에서 더 안전한 선택이 될 수 있습니다.</p>",
+          "foryou": "다음 숏폼 영상 소재가 정해지면, 파이카의 장면별 구성안 기능으로 초안을 빠르게 뽑아보세요."
+        }
+      ]
+    }
+  ]
+};
+
+/* ============================================================================
+   렌더링
+   ============================================================================ */
+(function () {
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const html = (s) => s; // 데이터 안의 <b> 허용 (신뢰된 자체 콘텐츠)
+  const m = NEWSLETTER.meta;
+  const topics = NEWSLETTER.topics;
+
+  // --- 헤더 ---
+  document.getElementById("header").innerHTML = `
+    <div class="nl-icon">${esc(m.icon)}</div>
+    <div class="nl-eyebrow">
+      <span class="nl-eyebrow__chip">🗓️ ${esc(m.date)}</span>
+      <span>${esc(m.edition)} · ${esc(m.cadence)}</span>
+    </div>
+    <h1 class="nl-title">${esc(m.title[0])}<b>${esc(m.title[1])}</b></h1>
+    <p class="nl-lead">${esc(m.lead)}</p>
+    <div class="nl-meta">
+      <span>🤖 큐레이터 <b>${esc(m.curator)}</b></span>
+      <span>🎯 관심사 <b>${topics.length}</b>개</span>
+    </div>
+    <div class="nl-greet">
+      <span class="nl-greet__icon">👋</span>
+      <div>${m.greeting}</div>
+    </div>`;
+
+  // --- 탭 ---
+  const tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = topics.map((t, i) => `
+    <button class="nl-tab nl-tint-${esc(t.tint)}" role="tab" id="tab-${esc(t.id)}"
+            data-i="${i}" aria-selected="${i === 0}" aria-controls="panel">
+      <span class="nl-tab__dot"></span>${esc(t.icon)} ${esc(t.label)}
+    </button>`).join("");
+
+  // --- 패널 ---
+  const panelEl = document.getElementById("panel");
+  // 긴 글은 기본 접힘 — detail이 있으면 '자세히 보기' 토글을 단다.
+  const detailBlock = (d) => d
+    ? `<button class="nl-more-btn" type="button" aria-expanded="false"><span class="nl-more-btn__t">자세히 보기</span><span class="nl-more-btn__chev">▾</span></button><div class="nl-detail">${html(d)}</div>`
+    : "";
+  function articleCard(a) {
+    return `
+      <article class="nl-card">
+        <div class="nl-card__meta">
+          <span class="nl-tag">${esc(a.tag)}</span>
+          <span class="nl-card__dot"></span>
+          ${a.url
+            ? `<a class="nl-src" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.source)}<span class="nl-src__ext">↗</span></a>`
+            : `<span>${esc(a.source)}</span>`}
+          ${a.time ? `<span class="nl-card__dot"></span><span>${esc(a.time)}</span>` : ""}
+          ${a.published ? `<span class="nl-card__dot"></span><span>🗓 발행 ${esc(a.published)}</span>` : ""}
+        </div>
+        <h4 class="nl-card__title">${esc(a.title)}</h4>
+        <p class="nl-card__summary">${esc(a.summary)}</p>
+        ${detailBlock(a.detail)}
+        <div class="nl-foryou">
+          <span class="nl-foryou__label">✨ 나를 위한 한 줄</span>
+          <span class="nl-foryou__text">${html(a.foryou)}</span>
+        </div>
+      </article>`;
+  }
+  function render(i) {
+    const t = topics[i];
+    panelEl.className = "nl-panel nl-tint-" + t.tint;
+    panelEl.setAttribute("aria-labelledby", "tab-" + t.id);
+    panelEl.innerHTML = `
+      <div class="nl-panel__head">
+        <span class="nl-panel__icon">${esc(t.icon)}</span>
+        <h3 class="nl-panel__title">${esc(t.label)}</h3>
+      </div>
+      <p class="nl-panel__desc">${esc(t.desc)}</p>
+      ${t.criteria ? `<details class="nl-criteria"><summary>ⓘ 이 소식들은 이렇게 골랐어요</summary><div class="nl-criteria__body">${html(t.criteria)}</div></details>` : ""}
+
+      <section class="nl-hl">
+        <span class="nl-hl__kicker">⭐ ${esc(t.highlight.kicker)}</span>
+        <h2 class="nl-hl__title">${esc(t.highlight.title)}</h2>
+        <p class="nl-hl__summary">${esc(t.highlight.summary)}</p>
+        ${detailBlock(t.highlight.detail)}
+        ${t.highlight.url
+          ? `<div class="nl-hl__src">🔗 출처: <a href="${esc(t.highlight.url)}" target="_blank" rel="noopener">${esc(t.highlight.source || "원문 보기")} ↗</a>${t.highlight.published ? ` · 🗓 발행 ${esc(t.highlight.published)}` : ""}</div>`
+          : ""}
+        <div class="nl-foryou nl-foryou--lg">
+          <span class="nl-foryou__label">✨ 나를 위한 한 줄</span>
+          <span class="nl-foryou__text">${html(t.highlight.foryou)}</span>
+        </div>
+      </section>
+
+      <div class="nl-more__label">더 읽을거리</div>
+      <div class="nl-grid">${t.articles.map(articleCard).join("")}</div>`;
+  }
+  tabsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".nl-tab");
+    if (!btn) return;
+    const i = +btn.dataset.i;
+    tabsEl.querySelectorAll(".nl-tab").forEach((b) => b.setAttribute("aria-selected", String(+b.dataset.i === i)));
+    render(i);
+  });
+  render(0);
+
+  // '자세히 보기' 토글 (패널은 탭마다 다시 그려지므로 위임)
+  panelEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".nl-more-btn");
+    if (!b) return;
+    const open = b.getAttribute("aria-expanded") === "true";
+    b.setAttribute("aria-expanded", String(!open));
+    const d = b.nextElementSibling;
+    if (d && d.classList.contains("nl-detail")) d.classList.toggle("open", !open);
+    const t = b.querySelector(".nl-more-btn__t");
+    if (t) t.textContent = open ? "자세히 보기" : "접기";
+  });
+
+  // --- 푸터 ---
+  document.getElementById("footer").innerHTML = `
+    <footer class="nl-footer">
+      <div class="nl-footer__brand">
+        <div class="nl-footer__logo">준</div>
+        <div>
+          <div class="nl-footer__name">${esc(m.title[0])}${esc(m.title[1])}</div>
+          <div class="nl-footer__sub">러닝 에이전트가 ${esc(m.cadence)} 큐레이션 · Folio 디자인 시스템 기반</div>
+        </div>
+      </div>
+      <p>관심사를 바꾸고 싶다면 에이전트에게 한 줄이면 됩니다 — “이번 주는 OO 주제도 탭으로 넣어줘.”</p>
+      <div class="nl-footer__next">📮 <b>다음 호부터는 매주</b> 같은 방식으로 지난 한 주간의 AI 소식을 정리해 전해드릴게요. 관심사 탭을 더하거나 바꾸고 싶으면 언제든 말씀해주세요.</div>
+      <p class="nl-footer__disc">※ 모든 기사는 원문 링크와 발행일을 확인해 정리했으며, 확인되지 않은 내용은 싣지 않았습니다. 정확한 맥락은 원문에서 직접 확인해 주세요. · 디자인: Folio (claude.ai/design) · 단일 HTML, 외부 의존성 없음(폰트 CDN 제외).</p>
+    </footer>`;
+})();
+
+/* ============================================================================
+   테마 — 시스템 자동 반영(기본) + 명시적 라이트/다크 오버라이드
+   ============================================================================ */
+(function () {
+  const root = document.documentElement;
+  const body = document.body;
+  const btn = document.getElementById("themeBtn");
+  const mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  function saved() { try { return localStorage.getItem("nl-theme"); } catch (e) { return null; } }
+  function systemDark() { return mq ? mq.matches : false; }
+  function resolvedDark() {
+    const s = saved();
+    if (s === "dark") return true;
+    if (s === "light") return false;
+    return systemDark(); // 기본: 시스템 설정 따르기
+  }
+  function apply() { body.classList.toggle("fl-dark", resolvedDark()); }
+
+  btn.addEventListener("click", () => {
+    const next = resolvedDark() ? "light" : "dark";
+    try { localStorage.setItem("nl-theme", next); } catch (e) {}
+    root.dataset.nlTheme = next;
+    apply();
+  });
+  // 오버라이드가 없으면 시스템 설정 변경을 실시간 반영
+  if (mq) mq.addEventListener("change", () => { if (!saved()) apply(); });
+  apply();
+})();
+</script>
+
+</body>
+</html>
